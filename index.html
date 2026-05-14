@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Incident Decode Lab</title>
+  <style>
+    :root {
+      --term-bg: #111417;
+      --term-fg: #d3d7cf;
+      --term-green: #4e9a06;
+      --term-red: #cc0000;
+      --term-prompt: #268bd2;
+      --wm-bg: #2b2e33;
+      --wm-border: #1a1a1a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #1c232e 0%, #0d1218 100%);
+      color: var(--term-fg);
+      font-family: "Consolas", "Fira Code", "DejaVu Sans Mono", monospace;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .window {
+      width: 85%;
+      max-width: 1040px;
+      height: 78vh;
+      background-color: var(--term-bg);
+      border: 1px solid var(--wm-border);
+      border-radius: 8px 8px 0 0;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .title-bar {
+      background-color: var(--wm-bg);
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: sans-serif;
+      font-size: 13px;
+      color: #ccc;
+      user-select: none;
+      border-bottom: 1px solid #111;
+    }
+
+    .title-bar-text {
+      font-weight: bold;
+    }
+
+    .window-controls {
+      display: flex;
+      gap: 6px;
+    }
+
+    .control-btn {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .btn-close {
+      background-color: #ff5f56;
+    }
+
+    .btn-min {
+      background-color: #ffbd2e;
+    }
+
+    .btn-max {
+      background-color: #27c93f;
+    }
+
+    .terminal-content {
+      padding: 15px;
+      flex-grow: 1;
+      overflow-y: auto;
+      font-size: 14.5px;
+      line-height: 1.5;
+    }
+
+    .terminal-header {
+      margin-bottom: 20px;
+      color: #888;
+    }
+
+    .terminal-output {
+      white-space: pre-wrap;
+      margin-bottom: 6px;
+    }
+
+    .prompt-wrapper {
+      position: relative;
+      padding-left: 24px;
+      margin: 10px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .prompt-wrapper::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.75em;
+      bottom: 0.75em;
+      border-left: 2px solid var(--term-prompt);
+    }
+
+    .zsh-line1,
+    .zsh-line2 {
+      position: relative;
+      display: flex;
+      align-items: center;
+      color: var(--term-prompt);
+      font-weight: bold;
+    }
+
+    .zsh-line2 {
+      overflow: visible;
+    }
+
+    .zsh-line1::before {
+      content: "";
+      position: absolute;
+      left: -24px;
+      top: 50%;
+      width: 18px;
+      border-top: 2px solid var(--term-prompt);
+    }
+
+    .zsh-line2::before {
+      content: "";
+      position: absolute;
+      left: -24px;
+      top: 50%;
+      width: 12px;
+      border-top: 2px solid var(--term-prompt);
+    }
+
+    .path {
+      color: var(--term-fg);
+      font-weight: normal;
+    }
+
+    .prompt-symbol {
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    #cmd-input {
+      background: transparent;
+      border: none;
+      color: var(--term-fg);
+      font-family: inherit;
+      font-size: inherit;
+      flex: 0 0 auto;
+      outline: none;
+      padding: 0;
+      margin: 0;
+      line-height: 1.5;
+      min-width: 18ch;
+      width: 18ch;
+    }
+
+    .prompt-command {
+      color: var(--term-fg);
+      font-weight: normal;
+      display: inline-block;
+      white-space: nowrap;
+      flex: 0 0 auto;
+      min-width: 0;
+    }
+
+    .inline-code {
+      color: #93c5fd;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--term-bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    @media (max-width: 960px) {
+      .window {
+        width: calc(100% - 24px);
+        height: 84vh;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="window">
+    <div class="title-bar">
+      <div class="title-bar-text">analyst@kmutt: ~</div>
+      <div class="window-controls">
+        <span class="control-btn btn-min"></span>
+        <span class="control-btn btn-max"></span>
+        <span class="control-btn btn-close"></span>
+      </div>
+    </div>
+
+    <div class="terminal-content" id="terminal-content">
+      <div class="terminal-header">
+        Challenge: Incident Decode Lab<br>
+        Type <span class="inline-code">help</span> to list investigation commands.<br>
+      </div>
+
+      <div id="output"></div>
+
+      <div class="prompt-wrapper" id="input-line">
+        <div class="zsh-line1">
+          <span>(analyst㉿kmutt)-<span class="path">[~/cases/ciphertrace]</span></span>
+        </div>
+        <div class="zsh-line2">
+          <span class="prompt-symbol">$</span>
+          <input type="text" id="cmd-input" autocomplete="off" autofocus>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const payloadText =
+      "ewoiYWxnIjoiQUVTLTI1Ni1DQkMiLAoiaXZfaGV4IjoiYzM0NDQ5NDI2ZDZiNjVkZmM2YjQ0ZDZmNjI0YmQ3NWMiLAoiY2lwaGVydGV4dF9oZXgiOiJhMzZiN2UyZjRmOWRhMjMxN2FkYmNiNzg1MzU2NDQ5MjdkZGE5OTg5YTExYzYxOGI3NmU2MDQzMWI4YjBlY2E4Igp9";
+    const secretText =
+      "JNSXSPJWMVTGGYJVHE2DQOBUME4DGZRYMRRDSMLEGY3GEZTGG44GIYZYME3DAYTEGA2GGNTDMRSTCOBRGEZTEMDFGUZDEZBRHA2TMZRUGUZDI===";
+    const decodedJson = `{
+"alg":"AES-256-CBC",
+"iv_hex":"c34449426d6b65dfc6b44d6f624bd75c",
+"ciphertext_hex":"a36b7e2f4f9da2317adbcb78535644927dda9989a11c618b76e60431b8b0eca8"
+}`;
+    const encodingFormatText = `Encoding | Character Set
+Base16 | 0-9 A-F
+Base32 | A-Z 2-7 =
+Base45 | 0-9 A-Z space $ % * + - . / :
+Base64 | 0-9 A-Z a-z + / =`;
+    const correctIv = "c34449426d6b65dfc6b44d6f624bd75c";
+    const correctInput = "a36b7e2f4f9da2317adbcb78535644927dda9989a11c618b76e60431b8b0eca8";
+    const correctKey = "6efca594884a83f8db91d66bff78dc8a60bd04c6cde1811320e522d1856f4524";
+    const decodedSecret = `Key=${correctKey}`;
+    const correctFlag = "flag{you_found_me}";
+
+    const cmdInput = document.getElementById("cmd-input");
+    const outputDiv = document.getElementById("output");
+    const inputLine = document.getElementById("input-line");
+    const terminalContent = document.getElementById("terminal-content");
+    let inputMeasureCanvas = null;
+
+    function buildAesCommand(key, iv, input) {
+      return `printf '%s' '${input}' | xxd -r -p | openssl enc -aes-256-cbc -d -K ${key} -iv ${iv} -nosalt`;
+    }
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function getInputMeasureCanvas() {
+      if (!inputMeasureCanvas) {
+        inputMeasureCanvas = document.createElement("canvas");
+      }
+      return inputMeasureCanvas;
+    }
+
+    function measureInputTextWidth(input) {
+      const canvas = getInputMeasureCanvas();
+      const context = canvas.getContext("2d");
+      const styles = window.getComputedStyle(input);
+      const text = input.value || input.placeholder || "";
+      context.font = styles.font;
+      const padding =
+        Number.parseFloat(styles.paddingLeft) +
+        Number.parseFloat(styles.paddingRight) +
+        Number.parseFloat(styles.borderLeftWidth) +
+        Number.parseFloat(styles.borderRightWidth);
+
+      return Math.ceil(context.measureText(text).width + padding + 8);
+    }
+
+    function syncCmdInputWidth() {
+      const currentWidth = Math.ceil(cmdInput.getBoundingClientRect().width);
+      const baseWidth = Number.parseFloat(cmdInput.dataset.baseWidth || `${currentWidth}`);
+      if (!cmdInput.dataset.baseWidth) {
+        cmdInput.dataset.baseWidth = `${baseWidth}`;
+      }
+      cmdInput.style.width = `${Math.max(baseWidth, measureInputTextWidth(cmdInput))}px`;
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function measurePromptCommandWidth(command) {
+      const canvas = getInputMeasureCanvas();
+      const context = canvas.getContext("2d");
+      const styles = window.getComputedStyle(cmdInput);
+      context.font = styles.font;
+      return Math.ceil(context.measureText(command).width + 2);
+    }
+
+    function getPromptHTML(command) {
+      const safeCommand = escapeHtml(command);
+      const commandWidth = measurePromptCommandWidth(command);
+      return `
+            <div class="prompt-wrapper" style="margin-bottom:0;">
+              <div class="zsh-line1">
+                <span>(analyst㉿kmutt)-<span class="path">[~/cases/ciphertrace]</span></span>
+              </div>
+              <div class="zsh-line2">
+                <span class="prompt-symbol">$</span>
+                <span class="prompt-command" style="width:${commandWidth}px;">${safeCommand}</span>
+              </div>
+            </div>`;
+    }
+
+    function printOutput(text, color = "var(--term-fg)") {
+      const line = document.createElement("div");
+      line.className = "terminal-output";
+      line.style.color = color;
+      line.textContent = text;
+      outputDiv.appendChild(line);
+      terminalContent.scrollTop = terminalContent.scrollHeight;
+    }
+
+    function parseDecodeCommand(command) {
+      const echoMatch = command.match(/^echo\s+(['"])(.*)\1\s+\|\s+(base(?:16|32|45|64))\s+-d$/);
+      if (echoMatch) {
+        return { decoder: echoMatch[3], input: echoMatch[2] };
+      }
+
+      return null;
+    }
+
+    function parseAesCommand(command) {
+      const match = command.match(
+        /^printf\s+'%s'\s+'([0-9a-f]+)'\s+\|\s+xxd\s+-r\s+-p\s+\|\s+openssl\s+enc\s+-aes-256-cbc\s+-d\s+-K\s+([0-9a-f]+)\s+-iv\s+([0-9a-f]+)\s+-nosalt$/i
+      );
+
+      if (!match) {
+        return null;
+      }
+
+      return {
+        input: match[1],
+        key: match[2],
+        iv: match[3]
+      };
+    }
+
+    function readVirtualFile(fileName) {
+      const files = {
+        "payload.txt": payloadText,
+        "encoding_format.txt": encodingFormatText,
+        "secret.txt": secretText
+      };
+
+      return files[fileName] || null;
+    }
+
+    function runDecode(decoder, input) {
+      if (input === payloadText) {
+        if (decoder !== "base64") {
+          return {
+            text: `Tried ${decoder}.
+
+The output does not match readable JSON metadata.
+Compare the payload character set with encoding_format.txt again.`,
+            color: "var(--term-fg)"
+          };
+        }
+
+        return {
+          text: decodedJson,
+          color: "var(--term-green)"
+        };
+      }
+
+      if (input === secretText) {
+        if (decoder !== "base32") {
+          return {
+            text: `Tried ${decoder}.
+
+The output does not match the expected key material.
+Compare the secret character set with encoding_format.txt again.`,
+            color: "var(--term-fg)"
+          };
+        }
+
+        return {
+          text: decodedSecret,
+          color: "var(--term-green)"
+        };
+      }
+
+      throw new Error("Paste the exact content from payload.txt or secret.txt before trying to decode.");
+    }
+
+    async function executeCommand(command) {
+      const trimmed = command.trim();
+      await sleep(250);
+
+      const decodeCommand = parseDecodeCommand(trimmed);
+      const aesCommand = parseAesCommand(trimmed);
+      const catMatch = trimmed.match(/^cat\s+(.+)$/);
+
+      if (trimmed === "help") {
+        printOutput(`Available tools:
+  ls
+  cat <paste-file-name>
+  echo "<paste-encoded-text>" | base16 -d
+  echo "<paste-encoded-text>" | base32 -d
+  echo "<paste-encoded-text>" | base45 -d
+  echo "<paste-encoded-text>" | base64 -d
+  ${buildAesCommand("<key_hex>", "<iv_hex>", "<input_hex>")}
+  clear`);
+      } else if (trimmed === "ls") {
+        printOutput("encoding_format.txt\npayload.txt\nsecret.txt");
+      } else if (catMatch) {
+        const fileName = catMatch[1].trim();
+        const fileContent = readVirtualFile(fileName);
+
+        if (fileContent === null) {
+          printOutput(`cat: ${fileName}: No such file or directory`, "var(--term-red)");
+        } else {
+          printOutput(fileContent);
+        }
+      } else if (decodeCommand) {
+        try {
+          const result = runDecode(decodeCommand.decoder, decodeCommand.input);
+          printOutput(result.text, result.color);
+        } catch (error) {
+          printOutput(`${decodeCommand.decoder}: ${error.message}`, "var(--term-red)");
+        }
+      } else if (aesCommand) {
+        if (
+          aesCommand.input === correctInput &&
+          aesCommand.key === correctKey &&
+          aesCommand.iv === correctIv
+        ) {
+          printOutput(correctFlag, "var(--term-green)");
+        } else {
+          printOutput("openssl: AES parameters do not match yet.", "var(--term-red)");
+        }
+      } else if (trimmed === "clear") {
+        outputDiv.innerHTML = "";
+      } else {
+        printOutput(`zsh: command not found: ${trimmed.split(" ")[0]}`, "var(--term-red)");
+      }
+
+      inputLine.style.display = "flex";
+      cmdInput.focus();
+      terminalContent.scrollTop = terminalContent.scrollHeight;
+    }
+
+    syncCmdInputWidth();
+
+    terminalContent.addEventListener("click", () => {
+      if (window.getSelection().toString().length === 0) {
+        cmdInput.focus();
+      }
+    });
+
+    cmdInput.addEventListener("keypress", async (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+
+      const command = cmdInput.value.trim();
+      if (command === "") {
+        return;
+      }
+
+      inputLine.style.display = "none";
+      const promptLine = document.createElement("div");
+      promptLine.innerHTML = getPromptHTML(command);
+      outputDiv.appendChild(promptLine);
+      cmdInput.value = "";
+      syncCmdInputWidth();
+      await executeCommand(command);
+    });
+
+    cmdInput.addEventListener("input", syncCmdInputWidth);
+    window.addEventListener("resize", syncCmdInputWidth);
+  </script>
+</body>
+
+</html>
